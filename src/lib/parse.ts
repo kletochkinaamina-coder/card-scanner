@@ -1,6 +1,6 @@
 export interface CardData {
   number: string; // только цифры
-  iin: string; // 12 цифр
+  iin: string; // ИИН 12 цифр или IDN 9 цифр
   expiry: string; // MM/YY
 }
 
@@ -8,6 +8,10 @@ export interface ScanRow extends CardData {
   id: string;
   scannedAt: string; // ISO
 }
+
+/** Допустимые годы срока действия (две последние цифры) */
+export const EXPIRY_MIN_YY = 25;
+export const EXPIRY_MAX_YY = 35;
 
 /** Проверка номера карты алгоритмом Луна */
 export function luhn(digits: string): boolean {
@@ -26,7 +30,7 @@ export function luhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-/** Контрольная сумма ИИН/БИН Казахстана */
+/** Контрольная сумма ИИН/БИН Казахстана (12 цифр) */
 export function iinChecksum(iin: string): boolean {
   if (!/^\d{12}$/.test(iin)) return false;
   const d = iin.split("").map(Number);
@@ -49,8 +53,18 @@ export function iinPlausible(iin: string): boolean {
   return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31 && c >= 1 && c <= 6;
 }
 
+/** ИИН 12 цифр с верной контрольной суммой или IDN 9 цифр */
+export function isValidIdn(v: string): boolean {
+  if (/^\d{9}$/.test(v)) return true;
+  return iinChecksum(v);
+}
+
+/** Срок ММ/ГГ, год в допустимом диапазоне */
 export function isValidExpiry(exp: string): boolean {
-  return /^(0[1-9]|1[0-2])\/\d{2}$/.test(exp);
+  const m = exp.match(/^(0[1-9]|1[0-2])\/(\d{2})$/);
+  if (!m) return false;
+  const yy = Number(m[2]);
+  return yy >= EXPIRY_MIN_YY && yy <= EXPIRY_MAX_YY;
 }
 
 export function formatCardNumber(digits: string): string {
@@ -82,20 +96,23 @@ function findCardNumber(text: string): string {
 
 function findIin(text: string, exclude: string): string {
   const lines = text.split(/\r?\n/);
-  const candidates: string[] = [];
-  // 1. Отдельное число из 12 цифр
-  for (const m of text.match(/(?<!\d)\d{12}(?!\d)/g) ?? []) candidates.push(m);
-  // 2. Строка, в которой ровно 12 цифр
+  const c12: string[] = [];
+  const c9: string[] = [];
+  for (const m of text.match(/(?<!\d)\d{12}(?!\d)/g) ?? []) c12.push(m);
+  for (const m of text.match(/(?<!\d)\d{9}(?!\d)/g) ?? []) c9.push(m);
   for (const line of lines) {
     const d = line.replace(/\D/g, "");
-    if (d.length === 12) candidates.push(d);
+    if (d.length === 12) c12.push(d);
+    if (d.length === 9) c9.push(d);
   }
   const notCard = (c: string) => !exclude || !exclude.includes(c);
-  const strong = candidates.find((c) => notCard(c) && iinChecksum(c) && iinPlausible(c));
+  const strong = c12.find((c) => notCard(c) && iinChecksum(c) && iinPlausible(c));
   if (strong) return strong;
-  const plausible = candidates.find((c) => notCard(c) && iinPlausible(c));
+  const idn9 = c9.find(notCard);
+  if (idn9) return idn9;
+  const plausible = c12.find((c) => notCard(c) && iinPlausible(c));
   if (plausible) return plausible;
-  return candidates.find(notCard) ?? "";
+  return c12.find(notCard) ?? "";
 }
 
 function findExpiry(text: string): string {
@@ -104,10 +121,9 @@ function findExpiry(text: string): string {
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) found.push(`${m[1]}/${m[2]}`);
   if (!found.length) return "";
-  const nowYY = new Date().getFullYear() % 100;
-  // предпочитаем дату в будущем (срок действия, а не "member since")
-  const future = found.filter((f) => Number(f.slice(3)) >= nowYY);
-  const pool = future.length ? future : found;
+  // только существующие сроки (25–35 год); если таких нет — последний найденный
+  const valid = found.filter(isValidExpiry);
+  const pool = valid.length ? valid : found;
   return pool[pool.length - 1];
 }
 

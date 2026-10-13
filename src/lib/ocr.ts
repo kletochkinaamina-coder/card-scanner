@@ -76,7 +76,7 @@ export interface OcrResult extends CardData {
   rawText: string;
 }
 
-/** Распознаёт карту: сначала блочный режим, при нехватке полей — разреженный текст */
+/** Полное распознавание: блочный режим, при нехватке полей — разреженный текст */
 export async function recognizeCard(
   canvas: HTMLCanvasElement,
   onProgress?: (p: number) => void,
@@ -102,4 +102,52 @@ export async function recognizeCard(
     };
   }
   return { ...data, rawText: raw };
+}
+
+/** Сбросить зависший воркер — следующий вызов создаст новый */
+export async function resetWorker() {
+  const p = workerPromise;
+  workerPromise = null;
+  if (p) {
+    try {
+      const w = await p;
+      await w.terminate();
+    } catch {}
+  }
+}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      },
+    );
+  });
+}
+
+/** Быстрое распознавание одного кадра для автосканирования (с таймаутом) */
+export async function recognizeFrame(canvas: HTMLCanvasElement, timeoutMs = 25000): Promise<OcrResult> {
+  progressCb = undefined;
+  const img = preprocess(canvas, 1200);
+  try {
+    return await withTimeout(
+      (async () => {
+        const worker = await getWorker();
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT });
+        const r = await worker.recognize(img);
+        return { ...parseOcrText(r.data.text), rawText: r.data.text };
+      })(),
+      timeoutMs,
+    );
+  } catch (e) {
+    if (e instanceof Error && e.message === "timeout") await resetWorker();
+    throw e;
+  }
 }

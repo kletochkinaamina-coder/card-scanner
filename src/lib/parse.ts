@@ -30,33 +30,12 @@ export function luhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-/** Контрольная сумма ИИН/БИН Казахстана (12 цифр) */
-export function iinChecksum(iin: string): boolean {
-  if (!/^\d{12}$/.test(iin)) return false;
-  const d = iin.split("").map(Number);
-  const w1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
-  const w2 = [3, 4, 5, 6, 7, 8, 9, 10, 11, 1, 2];
-  let s = d.slice(0, 11).reduce((acc, x, i) => acc + x * w1[i], 0) % 11;
-  if (s === 10) {
-    s = d.slice(0, 11).reduce((acc, x, i) => acc + x * w2[i], 0) % 11;
-    if (s === 10) return false;
-  }
-  return s === d[11];
-}
+/** Допустимые длины IDN */
+export const IDN_LENGTHS = [9, 11];
 
-/** Правдоподобная дата рождения в первых 6 цифрах ИИН */
-export function iinPlausible(iin: string): boolean {
-  if (!/^\d{12}$/.test(iin)) return false;
-  const mm = Number(iin.slice(2, 4));
-  const dd = Number(iin.slice(4, 6));
-  const c = Number(iin[6]);
-  return mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31 && c >= 1 && c <= 6;
-}
-
-/** ИИН 12 цифр с верной контрольной суммой или IDN 9 цифр */
+/** IDN: ровно 9 или 11 цифр */
 export function isValidIdn(v: string): boolean {
-  if (/^\d{9}$/.test(v)) return true;
-  return iinChecksum(v);
+  return /^\d+$/.test(v) && IDN_LENGTHS.includes(v.length);
 }
 
 /** Срок ММ/ГГ, год в допустимом диапазоне */
@@ -95,24 +74,22 @@ function findCardNumber(text: string): string {
 }
 
 function findIin(text: string, exclude: string): string {
-  const lines = text.split(/\r?\n/);
-  const c12: string[] = [];
-  const c9: string[] = [];
-  for (const m of text.match(/(?<!\d)\d{12}(?!\d)/g) ?? []) c12.push(m);
-  for (const m of text.match(/(?<!\d)\d{9}(?!\d)/g) ?? []) c9.push(m);
-  for (const line of lines) {
-    const d = line.replace(/\D/g, "");
-    if (d.length === 12) c12.push(d);
-    if (d.length === 9) c9.push(d);
-  }
   const notCard = (c: string) => !exclude || !exclude.includes(c);
-  const strong = c12.find((c) => notCard(c) && iinChecksum(c) && iinPlausible(c));
-  if (strong) return strong;
-  const idn9 = c9.find(notCard);
-  if (idn9) return idn9;
-  const plausible = c12.find((c) => notCard(c) && iinPlausible(c));
-  if (plausible) return plausible;
-  return c12.find(notCard) ?? "";
+  const candidates: string[] = [];
+  // 1. Отдельное число из 11 или 9 цифр (без пробелов)
+  for (const m of text.match(/(?<!\d)\d{11}(?!\d)/g) ?? []) candidates.push(m);
+  for (const m of text.match(/(?<!\d)\d{9}(?!\d)/g) ?? []) candidates.push(m);
+  // 2. Строка, в которой суммарно 11 или 9 цифр (OCR мог вставить пробелы)
+  for (const line of text.split(/\r?\n/)) {
+    const d = line.replace(/\D/g, "");
+    if (IDN_LENGTHS.includes(d.length)) candidates.push(d);
+  }
+  // 3. Число с пробелами внутри строки, например "123 456 789 01"
+  for (const m of text.match(/(?<!\d)\d[\d ]{8,14}\d(?!\d)/g) ?? []) {
+    const d = m.replace(/\D/g, "");
+    if (IDN_LENGTHS.includes(d.length)) candidates.push(d);
+  }
+  return candidates.find(notCard) ?? "";
 }
 
 function findExpiry(text: string): string {

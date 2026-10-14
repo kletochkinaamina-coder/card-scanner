@@ -6,7 +6,12 @@ let progressCb: ((p: number) => void) | undefined;
 
 export function getWorker(): Promise<Worker> {
   if (!workerPromise) {
+    // Все файлы движка отдаются с нашего домена — никаких внешних CDN
     workerPromise = createWorker("eng", 1, {
+      workerPath: "/tesseract/worker.min.js",
+      workerBlobURL: false,
+      corePath: "/tesseract/core",
+      langPath: "/tesseract/lang",
       logger: (m) => {
         if (m.status === "recognizing text" && progressCb) progressCb(m.progress);
       },

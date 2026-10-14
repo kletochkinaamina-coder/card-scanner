@@ -1,7 +1,7 @@
 import * as XLSX from "xlsx";
 import { ScanRow, expiryYear, formatCardNumber } from "./parse";
 
-const HEADER = ["№", "Номер карты", "ИИН", "Срок действия", "Дата сканирования"];
+const HEADER = ["№", "Номер карты", "IDN", "Срок действия", "Дата сканирования"];
 
 function toRows(rows: ScanRow[]): (string | number)[][] {
   return rows.map((r, i) => [

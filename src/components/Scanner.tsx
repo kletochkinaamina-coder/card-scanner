@@ -181,7 +181,7 @@ export default function Scanner() {
                 finish(data, c, r.rawText);
               } else if (acc.number && acc.expiry) {
                 acc.misses++;
-                setHint("Номер и срок найдены, ищу ИИН/IDN…");
+                setHint("Номер и срок найдены, ищу IDN…");
               } else if (acc.number) {
                 setHint("Номер найден, ищу срок действия…");
               } else if (acc.expiry || acc.iin) {
@@ -410,13 +410,13 @@ export default function Scanner() {
               />
             </label>
             <label className="text-sm">
-              ИИН (12 цифр) или IDN (9 цифр)
+              IDN (9 или 11 цифр)
               <input
                 className={inputCls(iinOk, form.iin)}
                 inputMode="numeric"
                 value={form.iin}
-                onChange={(e) => setForm({ ...form, iin: e.target.value.replace(/\D/g, "").slice(0, 12) })}
-                placeholder="9 или 12 цифр"
+                onChange={(e) => setForm({ ...form, iin: e.target.value.replace(/\D/g, "").slice(0, 11) })}
+                placeholder="9 или 11 цифр"
               />
             </label>
             <label className="text-sm">
@@ -508,7 +508,7 @@ export default function Scanner() {
                   <tr className="border-b text-left text-xs text-gray-500">
                     <th className="px-2 py-1">№</th>
                     <th className="px-2 py-1">Номер карты</th>
-                    <th className="px-2 py-1">ИИН / IDN</th>
+                    <th className="px-2 py-1">IDN</th>
                     <th className="px-2 py-1">Срок</th>
                     <th className="px-2 py-1"></th>
                   </tr>

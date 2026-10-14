@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "prebuild": "node scripts/copy-tesseract.mjs",
+    "predev": "node scripts/copy-tesseract.mjs"
   },
   "dependencies": {
     "next": "16.4.0",
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
+    "@tesseract.js-data/eng": "^1.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

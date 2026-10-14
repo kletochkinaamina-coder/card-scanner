@@ -42,3 +42,6 @@ next-env.d.ts
 AGENTS.md
 
 .vercel
+
+# OCR engine files are copied from node_modules at build time
+/public/tesseract

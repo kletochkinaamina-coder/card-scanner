@@ -45,3 +45,7 @@ AGENTS.md
 
 # OCR engine files are copied from node_modules at build time
 /public/tesseract
+
+# nested build output (dev server started from parent dir)
+**/.next/
+/card-scanner/

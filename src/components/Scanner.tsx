@@ -361,6 +361,7 @@ export default function Scanner() {
           <button
             onClick={() => {
               unlockAudio();
+              if (!sound) beepOk(); // при включении — пробный «бип»
               setSound((s) => !s);
             }}
             className="rounded-lg border border-gray-300 px-3 py-1 text-sm"

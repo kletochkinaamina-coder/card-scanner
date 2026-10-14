@@ -36,17 +36,30 @@ export function audioReady(): boolean {
   return !!ctx && ctx.state === "running";
 }
 
-function tone(freq: number, start: number, dur: number, vol = 0.35) {
+/**
+ * Тон как у пьезо-пищалки сканера штрихкодов: ровная громкость,
+ * мгновенное начало и конец (без затухания), лёгкая «пищащая» окраска.
+ */
+function tone(freq: number, start: number, dur: number, vol = 0.3) {
   if (!ctx) return;
   const osc = ctx.createOscillator();
+  const filter = ctx.createBiquadFilter();
   const gain = ctx.createGain();
   osc.type = "square";
   osc.frequency.value = freq;
-  gain.gain.setValueAtTime(vol, start);
-  gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
-  osc.connect(gain).connect(ctx.destination);
+  // срезаем верхние гармоники квадрата — звук как у пьезо, а не «8-бит»
+  filter.type = "lowpass";
+  filter.frequency.value = freq * 2.2;
+  filter.Q.value = 0.7;
+  const a = 0.003; // атака 3 мс
+  const r = 0.006; // спад 6 мс
+  gain.gain.setValueAtTime(0, start);
+  gain.gain.linearRampToValueAtTime(vol, start + a);
+  gain.gain.setValueAtTime(vol, start + dur - r);
+  gain.gain.linearRampToValueAtTime(0, start + dur);
+  osc.connect(filter).connect(gain).connect(ctx.destination);
   osc.start(start);
-  osc.stop(start + dur);
+  osc.stop(start + dur + 0.01);
 }
 
 function play(fn: (t: number) => void) {
@@ -61,21 +74,21 @@ function play(fn: (t: number) => void) {
   fn(c.currentTime);
 }
 
-/** «Пип-пип» как на кассе */
+/** Один короткий высокий «бип», как сканер на кассе супермаркета */
 export function beepOk() {
-  play((t) => {
-    tone(1400, t, 0.09);
-    tone(1400, t + 0.13, 0.09);
-  });
+  play((t) => tone(2730, t, 0.13));
   try {
-    navigator.vibrate?.([60, 60, 60]);
+    navigator.vibrate?.(80);
   } catch {}
 }
 
-/** Низкий сигнал ошибки / дубликата */
+/** Ошибка / дубликат: двойной низкий сигнал, как отказ на кассе */
 export function beepWarn() {
-  play((t) => tone(400, t, 0.3, 0.3));
+  play((t) => {
+    tone(620, t, 0.16, 0.35);
+    tone(620, t + 0.22, 0.16, 0.35);
+  });
   try {
-    navigator.vibrate?.(300);
+    navigator.vibrate?.([150, 80, 150]);
   } catch {}
 }

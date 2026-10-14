@@ -13,7 +13,7 @@ import {
   luhn,
 } from "@/lib/parse";
 import { downloadCsv, downloadXlsx, groupByYear } from "@/lib/export";
-import { beepOk, beepWarn, unlockAudio } from "@/lib/beep";
+import { audioReady, beepOk, beepWarn, unlockAudio } from "@/lib/beep";
 
 const STORAGE_KEY = "card-scanner-rows-v1";
 const SOUND_KEY = "card-scanner-sound";
@@ -49,6 +49,7 @@ export default function Scanner() {
   const [rows, setRows] = useState<ScanRow[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [sound, setSound] = useState(true);
+  const [audioOn, setAudioOn] = useState(false);
 
   // Сохранённые записи и настройка звука
   useEffect(() => {
@@ -75,11 +76,15 @@ export default function Scanner() {
     } catch {}
   }, [sound]);
 
-  // Разблокировать звук первым касанием
+  // Разблокировать звук любым касанием (браузер не даёт играть звук без жеста)
   useEffect(() => {
-    const h = () => unlockAudio();
-    window.addEventListener("pointerdown", h, { once: true });
-    return () => window.removeEventListener("pointerdown", h);
+    const h = () => {
+      unlockAudio();
+      window.setTimeout(() => setAudioOn(audioReady()), 50);
+    };
+    const evs = ["pointerdown", "touchend", "click", "keydown"] as const;
+    evs.forEach((e) => window.addEventListener(e, h, { passive: true }));
+    return () => evs.forEach((e) => window.removeEventListener(e, h));
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -369,6 +374,19 @@ export default function Scanner() {
         </div>
       </div>
 
+      {sound && !audioOn && (
+        <button
+          onClick={() => {
+            unlockAudio();
+            beepOk();
+            window.setTimeout(() => setAudioOn(audioReady()), 100);
+          }}
+          className="rounded-lg bg-amber-100 px-4 py-3 text-sm font-semibold text-amber-900 active:bg-amber-200"
+        >
+          Нажмите, чтобы включить звук сканера
+        </button>
+      )}
+
       {/* Камера / результат */}
       <section className="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         {status === "camera" && (
@@ -410,13 +428,13 @@ export default function Scanner() {
               />
             </label>
             <label className="text-sm">
-              IDN (9 или 11 цифр)
+              IDN (9 или 12 цифр)
               <input
                 className={inputCls(iinOk, form.iin)}
                 inputMode="numeric"
                 value={form.iin}
-                onChange={(e) => setForm({ ...form, iin: e.target.value.replace(/\D/g, "").slice(0, 11) })}
-                placeholder="9 или 11 цифр"
+                onChange={(e) => setForm({ ...form, iin: e.target.value.replace(/\D/g, "").slice(0, 12) })}
+                placeholder="9 или 12 цифр"
               />
             </label>
             <label className="text-sm">

@@ -31,9 +31,9 @@ export function luhn(digits: string): boolean {
 }
 
 /** Допустимые длины IDN */
-export const IDN_LENGTHS = [9, 11];
+export const IDN_LENGTHS = [9, 12];
 
-/** IDN: ровно 9 или 11 цифр */
+/** IDN: ровно 9 или 12 цифр */
 export function isValidIdn(v: string): boolean {
   return /^\d+$/.test(v) && IDN_LENGTHS.includes(v.length);
 }
@@ -76,16 +76,16 @@ function findCardNumber(text: string): string {
 function findIin(text: string, exclude: string): string {
   const notCard = (c: string) => !exclude || !exclude.includes(c);
   const candidates: string[] = [];
-  // 1. Отдельное число из 11 или 9 цифр (без пробелов)
-  for (const m of text.match(/(?<!\d)\d{11}(?!\d)/g) ?? []) candidates.push(m);
+  // 1. Отдельное число из 12 или 9 цифр (без пробелов)
+  for (const m of text.match(/(?<!\d)\d{12}(?!\d)/g) ?? []) candidates.push(m);
   for (const m of text.match(/(?<!\d)\d{9}(?!\d)/g) ?? []) candidates.push(m);
-  // 2. Строка, в которой суммарно 11 или 9 цифр (OCR мог вставить пробелы)
+  // 2. Строка, в которой суммарно 12 или 9 цифр (OCR мог вставить пробелы)
   for (const line of text.split(/\r?\n/)) {
     const d = line.replace(/\D/g, "");
     if (IDN_LENGTHS.includes(d.length)) candidates.push(d);
   }
-  // 3. Число с пробелами внутри строки, например "123 456 789 01"
-  for (const m of text.match(/(?<!\d)\d[\d ]{8,14}\d(?!\d)/g) ?? []) {
+  // 3. Число с пробелами внутри строки, например "123 456 789 012"
+  for (const m of text.match(/(?<!\d)\d[\d ]{7,16}\d(?!\d)/g) ?? []) {
     const d = m.replace(/\D/g, "");
     if (IDN_LENGTHS.includes(d.length)) candidates.push(d);
   }
